@@ -1,61 +1,48 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Saturn AR</title>
-    <!-- A-FrameとMindARの読み込み -->
-    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MindAR Saturn WebAR</title>
+    <!-- A-Frame と MindAR のライブラリを読み込み -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    <script>
-      // ゆっくり回転するコンポーネント
-      AFRAME.registerComponent('slow-rotate', {
-        tick: function (time, timeDelta) {
-          if (!this.el) return;
-          const currentRot = this.el.getAttribute('rotation');
-          this.el.setAttribute('rotation', {
-            x: currentRot.x,
-            y: currentRot.y + (1.0 * timeDelta / 100),
-            z: currentRot.z
-          });
-        }
-      });
-    </script>
-  </head>
-  <body style="margin: 0; overflow: hidden;">
-    <!-- ARシーン -->
-    <a-scene 
-      mindar-image="imageTargetSrc: ./saturn.mind; autoStart: true;" 
-      color-space="sRGB" 
-      renderer="colorManagement: true;" 
-      vr-mode-ui="enabled: false" 
-      device-orientation-permission-ui="enabled: false">
-      
-      <a-assets>
-        <!-- 3Dモデルの読み込み -->
-        <a-asset-item id="saturn" src="./saturn_planet.glb"></a-asset-item>
-      </a-assets>
+    <style>
+        body { margin: 0; overflow: hidden; }
+    </style>
+</head>
+<body>
 
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+    <!-- 
+      mindar-image に作成した「saturn.mind」を指定
+      autoStart: true で自動起動
+    -->
+    <a-scene mindar-image="imageTargetSrc: ./saturn.mind; autoStart: true; uiLoading: no; uiError: no; uiScanning: yes;" 
+             color-space="sRGB" 
+             renderer="colorManagement: true, physicallyCorrectLights: true" 
+             vr-mode-ui="enabled: false" 
+             device-orientation-permission-ui="enabled: false">
+        
+        <a-assets>
+            <!-- 3Dモデル（saturn_planet.glb）をアセットとして登録 -->
+            <a-asset-item id="saturnModel" src="./saturn_planet.glb"></a-asset-item>
+        </a-assets>
 
-      <!-- 光源（モデルを明るく見せるため） -->
-      <a-entity light="type: ambient; color: #FFF; intensity: 1.5"></a-entity>
-      <a-entity light="type: directional; color: #FFF; intensity: 1.0" position="-1 2 1"></a-entity>
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-      <!-- マーカーを検知するターゲット -->
-      <a-entity mindar-image-target="targetIndex: 0">
         <!-- 
-          モデルを表示し、ゆっくり回転させる。
-          ※表示されない場合は、このscale="0.05 0.05 0.05" を 0.001 や 1.0 などに変更してみてください。
+          targetIndex: 0 (最初の画像ターゲットに紐付け)
+          animation で Y軸を中心に360度、20秒（20000ミリ秒）かけて無限にゆっくり回転させる設定
         -->
-        <a-gltf-model 
-          src="#saturn" 
-          position="0 0 0" 
-          scale="0.05 0.05 0.05" 
-          rotation="0 0 0"
-          slow-rotate>
-        </a-gltf-model>
-      </a-entity>
-      
+        <a-entity mindar-image-target="targetIndex: 0">
+            <a-gltf-model src="#saturnModel" 
+                          position="0 0 0" 
+                          scale="1 1 1"
+                          animation="property: rotation; to: 0 360 0; dur: 20000; easing: linear; loop: true">
+            </a-gltf-model>
+        </a-entity>
+
     </a-scene>
-  </body>
+
+</body>
 </html>
