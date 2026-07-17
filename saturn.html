@@ -42,9 +42,9 @@
                     let rot = this.el.getAttribute('rotation');
                     
                     this.el.setAttribute('rotation', {
-                        x: rot.x - (deltaY * this.data.speed),
+                        x: rot.x + (deltaY * this.data.speed),
                         y: rot.y,
-                        z: rot.z + (deltaX * this.data.speed)
+                        z: rot.z - (deltaX * this.data.speed)
                     });
                     
                     this.previousPosition = currentPosition;
