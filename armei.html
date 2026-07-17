@@ -21,11 +21,12 @@
       color-space="sRGB" 
       renderer="colorManagement: true;" 
       vr-mode-ui="enabled: false" 
-      device-orientation-permission-ui="enabled: false">
+      device-orientation-permission-ui="enabled: false"
+      gltf-model="dracoDecoderPath: https://www.gstatic.com/draco/versioned/decoders/1.5.6/;">
         
         <!-- 3Dモデルを事前に読み込む -->
         <a-assets>
-            <a-asset-item id="girlModel" src="girl.glb"></a-asset-item>
+            <a-asset-item id="girlModel" src="girl_draco.glb"></a-asset-item>
         </a-assets>
 
         <!-- MindAR用のカメラ設定 -->
@@ -46,7 +47,7 @@
             <a-entity 
                 gltf-model="#girlModel" 
                 position="0 0 0" 
-                scale="0.5 0.5 0.5"
+                scale="0.05 0.05 0.05"
                 rotation="0 0 0"
                 animation-mixer> 
             </a-entity>
