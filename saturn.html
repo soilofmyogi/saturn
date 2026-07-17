@@ -163,7 +163,8 @@
     color-space="sRGB" 
     renderer="colorManagement: true; physicallyCorrectLights: true;" 
     vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false">
+    device-orientation-permission-ui="enabled: false"
+    gltf-model="dracoDecoderPath: https://www.gstatic.com/draco/versioned/decoders/1.5.6/;">
     
     <a-assets>
       <!-- GLBモデルの読み込みパス（ファイル名を saturn_planet.glb に調整） -->
@@ -191,7 +192,7 @@
         -->
         <a-entity 
           id="saturn-mesh"
-          gltf-model="src: #saturnModel; dracoDecoderPath: https://www.gstatic.com/draco/versioned/decoders/1.5.6/;" 
+          gltf-model="#saturnModel" 
           scale="1 1 1" 
           position="0 0 0"
           slow-rotate="speed: 0.5"
