@@ -3,23 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebAR Saturn</title>
+  <title>WebAR Saturn (.glb)</title>
   
   <!-- A-Frame と MindAR のライブラリを読み込み -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   
-  <!-- FBXモデルを読み込むための A-Frame 用ローダーコンポーネント -->
-  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.loaders.min.js"></script>
-
   <script>
-    // ゆっくり回転（開店）させるカスタムコンポーネントの登録
+    // ゆっくり回転させるカスタムコンポーネント
     AFRAME.registerComponent('slow-rotate', {
       schema: { speed: { type: 'number', default: 0.5 } },
       tick: function (time, timeDelta) {
-        // timeDelta（前フレームからの経過時間、ミリ秒）を利用して滑らかに回転
-        // 1秒間に（speed * 10）度回転する計算
         let currentRotation = this.el.getAttribute('rotation');
+        // 時間経過に合わせて滑らかにY軸を回転
         currentRotation.y += (this.data.speed * (timeDelta / 100));
         this.el.setAttribute('rotation', currentRotation);
       }
@@ -27,15 +23,55 @@
   </script>
 
   <style>
-    body { margin: 0; overflow: hidden; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    /* スキャン待ちの案内画面 */
+    #scanning-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      font-size: 18px;
+      z-index: 9999;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    #scanning-overlay.hidden {
+      opacity: 0;
+    }
+    .spinner {
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border-left-color: #fff;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
 
-  <!-- 
-    mindar-image に作成した .mind ファイルを指定。
-    autoStart: true で起動時にカメラを有効化。
-  -->
+  <!-- 案内オーバーレイUI -->
+  <div id="scanning-overlay">
+    <div class="spinner"></div>
+    <div>saturn.mindをカメラにかざしてください</div>
+  </div>
+
   <a-scene 
     mindar-image="imageTargetSrc: ./saturn.mind; autoStart: true; maxTrack: 1;" 
     color-space="sRGB" 
@@ -44,31 +80,50 @@
     device-orientation-permission-ui="enabled: false">
     
     <a-assets>
-      <!-- FBXモデルの読み込み（パスは環境に合わせて調整してください） -->
-      <a-asset-item id="saturnModel" src="./saturn.fbx"></a-asset-item>
+      <!-- GLBモデルの読み込み -->
+      <a-asset-item id="saturnModel" src="./saturn.glb"></a-asset-item>
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
     <!-- 
-      targetIndex: 0 (saturn.mind 内の最初のマーカーに紐付け) 
+      モデルが暗くならないよう、均一に照らす環境光（ambient）と、
+      陰影をつけて立体感を出す平行光（directional）を配置
     -->
-    <a-entity mindar-image-target="targetIndex: 0">
+    <a-entity light="type: ambient; color: #ffffff; intensity: 1.2"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 2 1"></a-entity>
+
+    <!-- ARマーカーターゲット -->
+    <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
       <!-- 
-        FBXモデルの配置。
-        slow-rotate コンポーネントを付与して回転。
-        モデルのサイズや初期角度は scale や rotation で調整してください。
+        GLBモデルを配置。
+        scale（大きさ）、position（位置）、rotation（初期角度）は、
+        実際のモデルの見え方に合わせて適宜微調整してください。
       -->
-      <a-entity 
-        fbx-model="#saturnModel" 
+      <a-gltf-model 
+        src="#saturnModel" 
         scale="1 1 1" 
-        position="0 0 0.5" 
+        position="0 0 0" 
         rotation="0 0 0"
         slow-rotate="speed: 0.5">
-      </a-entity>
+      </a-gltf-model>
     </a-entity>
 
   </a-scene>
+
+  <script>
+    // マーカー検知時・ロスト時に案内UIを出し入れする制御
+    const targetEl = document.querySelector('#ar-target');
+    const overlay = document.querySelector('#scanning-overlay');
+    
+    targetEl.addEventListener("targetFound", () => {
+      overlay.classList.add('hidden');
+    });
+    
+    targetEl.addEventListener("targetLost", () => {
+      overlay.classList.remove('hidden');
+    });
+  </script>
 
 </body>
 </html>
