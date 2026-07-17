@@ -9,6 +9,60 @@
     <style>
         body { margin: 0; overflow: hidden; }
     </style>
+    <script>
+        AFRAME.registerComponent('swipe-rotate', {
+            schema: { speed: { default: 0.5 } },
+            init: function () {
+                this.isDragging = false;
+                this.previousPosition = { x: 0, y: 0 };
+                
+                const onDragStart = (e) => {
+                    this.isDragging = true;
+                    this.previousPosition = {
+                        x: e.touches ? e.touches[0].screenX : e.screenX,
+                        y: e.touches ? e.touches[0].screenY : e.screenY
+                    };
+                };
+                
+                const onDragEnd = () => {
+                    this.isDragging = false;
+                };
+                
+                const onDragMove = (e) => {
+                    if (!this.isDragging) return;
+                    
+                    const currentPosition = {
+                        x: e.touches ? e.touches[0].screenX : e.screenX,
+                        y: e.touches ? e.touches[0].screenY : e.screenY
+                    };
+                    
+                    const deltaX = currentPosition.x - this.previousPosition.x;
+                    const deltaY = currentPosition.y - this.previousPosition.y;
+                    
+                    let rot = this.el.getAttribute('rotation');
+                    
+                    this.el.setAttribute('rotation', {
+                        x: rot.x - (deltaY * this.data.speed),
+                        y: rot.y,
+                        z: rot.z + (deltaX * this.data.speed)
+                    });
+                    
+                    this.previousPosition = currentPosition;
+                };
+
+                this.el.sceneEl.addEventListener('loaded', () => {
+                    const canvas = this.el.sceneEl.canvas;
+                    canvas.addEventListener('mousedown', onDragStart);
+                    canvas.addEventListener('mouseup', onDragEnd);
+                    canvas.addEventListener('mouseleave', onDragEnd);
+                    canvas.addEventListener('mousemove', onDragMove);
+                    canvas.addEventListener('touchstart', onDragStart);
+                    canvas.addEventListener('touchend', onDragEnd);
+                    canvas.addEventListener('touchmove', onDragMove);
+                });
+            }
+        });
+    </script>
 </head>
 <body>
 
@@ -34,7 +88,7 @@
                           position="0 0 0" 
                           scale="0.001 0.001 0.001"
                           rotation="90 0 0"
-                          animation="property: rotation; from: 0 0 0; to: 0 360 0; dur: 20000; easing: linear; loop: true">
+                          swipe-rotate>
             </a-gltf-model>
         </a-entity>
 
