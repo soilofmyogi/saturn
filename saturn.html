@@ -74,31 +74,49 @@
       </div>
     </div>
 
-    <!-- スケール調整セクション -->
-    <div class="space-y-2">
+    <!-- スケール調整セクション (対数スケール) -->
+    <div class="space-y-2 mb-4">
       <div class="flex justify-between items-center text-xs">
         <span class="text-slate-300 font-medium">表示サイズ (スケール)</span>
         <span id="scale-val" class="font-mono text-blue-300 bg-blue-950/40 px-2 py-0.5 rounded">0.0100</span>
       </div>
       
-      <!-- スライダー (極小から小サイズまでカバーする範囲) -->
+      <!-- スライダー (対数: 10^-6 から 10^3 まで) -->
       <input 
         id="scale-slider" 
         type="range" 
-        min="0.0001" 
-        max="0.1000" 
-        step="0.0001" 
-        value="0.0100" 
+        min="-6" 
+        max="3" 
+        step="0.1" 
+        value="-2" 
         class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
       >
 
       <!-- ショートカットサイズプリセットボタン -->
       <div class="grid grid-cols-4 gap-1 pt-1">
-        <button onclick="setPresetScale(0.001)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">0.001</button>
-        <button onclick="setPresetScale(0.005)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">0.005</button>
+        <button onclick="setPresetScale(0.0001)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">0.0001</button>
         <button onclick="setPresetScale(0.01)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition font-bold text-blue-300">0.01</button>
-        <button onclick="setPresetScale(0.05)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">0.05</button>
+        <button onclick="setPresetScale(1)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">1.0</button>
+        <button onclick="setPresetScale(100)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">100</button>
       </div>
+      <div id="model-size-info" class="text-xs text-slate-400 mt-2">元サイズ: 取得中...</div>
+    </div>
+
+    <!-- 高さ調整セクション -->
+    <div class="space-y-2">
+      <div class="flex justify-between items-center text-xs">
+        <span class="text-slate-300 font-medium">浮遊する高さ (Z軸)</span>
+        <span id="height-val" class="font-mono text-green-300 bg-green-950/40 px-2 py-0.5 rounded">0.50</span>
+      </div>
+      <input 
+        id="height-slider" 
+        type="range" 
+        min="-2" 
+        max="5" 
+        step="0.05" 
+        value="0.5" 
+        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+      >
     </div>
 
   </div>
@@ -126,11 +144,10 @@
     <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
       
       <!-- 
-        【頭を上に向けるための回転アライメント】
-        手前を向いている頭（Z軸方向）を、奥に90度倒して上（Y軸方向）に向けます。
-        X軸を -90 度回転させることで、奥方向へ綺麗に倒れます。
+        【高さをつけ、頭を上に向けるためのアライメント】
+        Z軸（手前向き）に数値を足すことで、マーカーから浮き上がります。
       -->
-      <a-entity rotation="-90 0 0">
+      <a-entity id="align-wrapper" position="0 0 0.5" rotation="-90 0 0">
         
         <!-- 
           【実際のモデルデータ】
@@ -165,6 +182,20 @@
     saturnMesh.addEventListener('model-loaded', () => {
       modelStatusText.textContent = '読み込み完了';
       modelStatusText.className = 'font-semibold text-green-400';
+      
+      // 元のサイズを取得して表示する
+      try {
+        const object3D = saturnMesh.getObject3D('mesh');
+        if (object3D) {
+          const box = new THREE.Box3().setFromObject(object3D);
+          const size = new THREE.Vector3();
+          box.getSize(size);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          document.querySelector('#model-size-info').textContent = `元サイズ: 約 ${maxDim.toFixed(2)} m`;
+        }
+      } catch (err) {
+        console.error("Size calc error", err);
+      }
     });
 
     saturnMesh.addEventListener('model-error', () => {
@@ -187,20 +218,44 @@
     function updateModelScale(scaleValue) {
       // スケールを適用
       saturnMesh.setAttribute('scale', `${scaleValue} ${scaleValue} ${scaleValue}`);
-      // 数値表示を更新 (小数点以下4桁固定)
-      scaleValText.textContent = Number(scaleValue).toFixed(4);
-      // スライダーの位置を同期
-      scaleSlider.value = scaleValue;
+      
+      // 数値表示を更新
+      if (scaleValue < 0.001 || scaleValue >= 1000) {
+        scaleValText.textContent = Number(scaleValue).toExponential(2);
+      } else {
+        scaleValText.textContent = Number(scaleValue).toFixed(4);
+      }
+      
+      // スライダーの位置を同期 (対数スケール)
+      scaleSlider.value = Math.log10(scaleValue);
     }
 
     scaleSlider.addEventListener('input', (e) => {
-      updateModelScale(e.target.value);
+      // スライダーの値(対数)から実スケールを計算して適用
+      const realScale = Math.pow(10, parseFloat(e.target.value));
+      updateModelScale(realScale);
     });
 
     // 4. クイックサイズ変更ボタン用のグローバル関数
     window.setPresetScale = function(value) {
       updateModelScale(value);
     };
+
+    // 5. 高さ調整の処理
+    const heightSlider = document.querySelector('#height-slider');
+    const heightValText = document.querySelector('#height-val');
+    const alignWrapper = document.querySelector('#align-wrapper');
+
+    function updateModelHeight(heightValue) {
+      // Z軸方向に高さを設定して浮かせる
+      alignWrapper.setAttribute('position', `0 0 ${heightValue}`);
+      heightValText.textContent = Number(heightValue).toFixed(2);
+    }
+
+    heightSlider.addEventListener('input', (e) => {
+      updateModelHeight(e.target.value);
+    });
+
   </script>
 
 </body>
