@@ -163,8 +163,7 @@
     color-space="sRGB" 
     renderer="colorManagement: true; physicallyCorrectLights: true;" 
     vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false"
-    gltf-model="dracoDecoderPath: https://www.gstatic.com/draco/versioned/decoders/1.5.6/;">
+    device-orientation-permission-ui="enabled: false">
     
     <a-assets>
       <!-- GLBモデルの読み込みパス（ファイル名を saturn_planet.glb に調整） -->
@@ -190,14 +189,14 @@
           【実際のモデルデータ】
           auto-normalizeによって常に幅1.0のサイズに補正され、原点も中心にリセットされます。
         -->
-        <a-entity 
+        <a-gltf-model 
           id="saturn-mesh"
-          gltf-model="#saturnModel" 
+          src="#saturnModel" 
           scale="1 1 1" 
           position="0 0 0"
           slow-rotate="speed: 0.5"
           auto-normalize>
-        </a-entity>
+        </a-gltf-model>
         
       </a-entity>
       
