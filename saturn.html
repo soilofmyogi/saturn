@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebAR Saturn</title>
+  
+  <!-- A-Frame と MindAR のライブラリを読み込み -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  
+  <!-- FBXモデルを読み込むための A-Frame 用ローダーコンポーネント -->
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.loaders.min.js"></script>
+
+  <script>
+    // ゆっくり回転（開店）させるカスタムコンポーネントの登録
+    AFRAME.registerComponent('slow-rotate', {
+      schema: { speed: { type: 'number', default: 0.5 } },
+      tick: function (time, timeDelta) {
+        // timeDelta（前フレームからの経過時間、ミリ秒）を利用して滑らかに回転
+        // 1秒間に（speed * 10）度回転する計算
+        let currentRotation = this.el.getAttribute('rotation');
+        currentRotation.y += (this.data.speed * (timeDelta / 100));
+        this.el.setAttribute('rotation', currentRotation);
+      }
+    });
+  </script>
+
+  <style>
+    body { margin: 0; overflow: hidden; }
+  </style>
+</head>
+<body>
+
+  <!-- 
+    mindar-image に作成した .mind ファイルを指定。
+    autoStart: true で起動時にカメラを有効化。
+  -->
+  <a-scene 
+    mindar-image="imageTargetSrc: ./saturn.mind; autoStart: true; maxTrack: 1;" 
+    color-space="sRGB" 
+    renderer="colorManagement: true, physicallyCorrectLights: true" 
+    vr-mode-ui="enabled: false" 
+    device-orientation-permission-ui="enabled: false">
+    
+    <a-assets>
+      <!-- FBXモデルの読み込み（パスは環境に合わせて調整してください） -->
+      <a-asset-item id="saturnModel" src="./saturn.fbx"></a-asset-item>
+    </a-assets>
+
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- 
+      targetIndex: 0 (saturn.mind 内の最初のマーカーに紐付け) 
+    -->
+    <a-entity mindar-image-target="targetIndex: 0">
+      <!-- 
+        FBXモデルの配置。
+        slow-rotate コンポーネントを付与して回転。
+        モデルのサイズや初期角度は scale や rotation で調整してください。
+      -->
+      <a-entity 
+        fbx-model="#saturnModel" 
+        scale="0.1 0.1 0.1" 
+        position="0 0 0" 
+        rotation="0 0 0"
+        slow-rotate="speed: 0.5">
+      </a-entity>
+    </a-entity>
+
+  </a-scene>
+
+</body>
+</html>
