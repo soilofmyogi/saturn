@@ -67,6 +67,18 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+    /* コントローラーの開閉アニメーション用 */
+    #controller-content {
+      transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+      max-height: 500px;
+      opacity: 1;
+      overflow: hidden;
+    }
+    #controller-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -80,59 +92,66 @@
     </div>
   </div>
 
-  <!-- 画面上のリアルタイムデバッグ・調整用UIコントローラー -->
-  <div class="fixed bottom-4 left-4 right-4 md:left-4 md:right-auto md:w-80 bg-slate-900/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-slate-700/50 z-50 transition-all">
-    <div class="flex justify-between items-center mb-3">
-      <h3 class="font-bold text-sm tracking-wider text-blue-400 flex items-center gap-1">
-        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+  <!-- 画面上のリアルタイムデバッグ・調整用UIコントローラー（コンパクト＆開閉機能付き） -->
+  <div class="fixed bottom-4 left-4 right-4 md:left-4 md:right-auto md:w-72 bg-slate-900/95 backdrop-blur-md text-white p-3 rounded-xl shadow-2xl border border-slate-700/50 z-50 transition-all text-xs">
+    <!-- ヘッダー部分（クリックして開閉可能） -->
+    <div onclick="toggleController()" class="flex justify-between items-center cursor-pointer select-none pb-1 border-b border-slate-800">
+      <h3 class="font-bold tracking-wider text-blue-400 flex items-center gap-1.5 text-[11px]">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
         MODEL CONTROLLER
       </h3>
-      <span id="target-status" class="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full border border-red-500/30">マーカー未検出</span>
+      <div class="flex items-center gap-2">
+        <span id="target-status" class="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full border border-red-500/30">マーカー未検出</span>
+        <svg id="collapse-icon" class="w-4 h-4 text-slate-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+      </div>
     </div>
 
-    <!-- デバッグ用ログ表示エリア（トラブルが一目で分かる） -->
-    <div class="bg-black/40 rounded-lg p-2 text-[10px] font-mono text-slate-300 mb-3 max-h-16 overflow-y-auto" id="debug-log">
-      システム初期化中...
-    </div>
-
-    <!-- 各種パラメータ調整スライダー -->
-    <div class="space-y-3 text-xs">
-      <!-- スケール（倍率）の桁数コントロール -->
-      <div>
-        <div class="flex justify-between mb-1">
-          <span class="text-slate-400">スケール基準 (現在: <span id="scale-val" class="font-bold text-white">1.0</span>)</span>
-        </div>
-        <div class="grid grid-cols-4 gap-1">
-          <button onclick="changeScalePreset(0.01)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">極小 (0.01)</button>
-          <button onclick="changeScalePreset(0.1)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">小 (0.1)</button>
-          <button onclick="changeScalePreset(1.0)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">等倍 (1.0)</button>
-          <button onclick="changeScalePreset(10.0)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">極大 (10.0)</button>
-        </div>
-        <input type="range" id="scale-slider" min="0.001" max="5" step="0.001" value="1" class="w-full mt-2 accent-blue-500">
+    <!-- 開閉するコンテンツエリア -->
+    <div id="controller-content" class="mt-2.5 space-y-2.5">
+      <!-- デバッグ用ログ表示エリア -->
+      <div class="bg-black/40 rounded-md p-1.5 font-mono text-[9px] text-slate-400 max-h-12 overflow-y-auto" id="debug-log">
+        システム初期化中...
       </div>
 
-      <!-- 位置調整 (Z軸：手前・奥) -->
-      <div>
-        <div class="flex justify-between mb-1">
-          <span class="text-slate-400">位置: 前後 (Z軸: <span id="pos-z-val" class="font-bold text-white">0.0</span>)</span>
+      <!-- 各種パラメータ調整スライダー -->
+      <div class="space-y-2 text-[10px]">
+        <!-- スケール（倍率）の桁数コントロール -->
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">スケール基準 (現在: <span id="scale-val" class="font-bold text-white">1.0</span>)</span>
+          </div>
+          <div class="grid grid-cols-4 gap-1">
+            <button onclick="changeScalePreset(0.01)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">極小 (0.01)</button>
+            <button onclick="changeScalePreset(0.1)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">小 (0.1)</button>
+            <button onclick="changeScalePreset(1.0)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">等倍 (1.0)</button>
+            <button onclick="changeScalePreset(10.0)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">極大 (10.0)</button>
+          </div>
+          <input type="range" id="scale-slider" min="0.001" max="5" step="0.001" value="1" class="w-full mt-1.5 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
         </div>
-        <input type="range" id="pos-z-slider" min="-3" max="3" step="0.1" value="0" class="w-full accent-blue-500">
-      </div>
 
-      <!-- 位置調整 (Y軸：上下) -->
-      <div>
-        <div class="flex justify-between mb-1">
-          <span class="text-slate-400">位置: 上下 (Y軸: <span id="pos-y-val" class="font-bold text-white">0.0</span>)</span>
+        <!-- 位置調整 (Z軸：手前・奥) -->
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">位置: 前後 (Z軸: <span id="pos-z-val" class="font-bold text-white">0.0</span>)</span>
+          </div>
+          <input type="range" id="pos-z-slider" min="-3" max="3" step="0.1" value="0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
         </div>
-        <input type="range" id="pos-y-slider" min="-3" max="3" step="0.1" value="0" class="w-full accent-blue-500">
-      </div>
 
-      <!-- 回転速度 -->
-      <div>
-        <div class="flex justify-between mb-1">
-          <span class="text-slate-400">開店（回転）速度 (現在: <span id="speed-val" class="font-bold text-white">0.5</span>)</span>
+        <!-- 位置調整 (Y軸：上下) -->
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">位置: 上下 (Y軸: <span id="pos-y-val" class="font-bold text-white">0.0</span>)</span>
+          </div>
+          <input type="range" id="pos-y-slider" min="-3" max="3" step="0.1" value="0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
         </div>
-        <input type="range" id="speed-slider" min="0" max="3" step="0.1" value="0.5" class="w-full accent-blue-500">
+
+        <!-- 回転速度 -->
+        <div>
+          <div class="flex justify-between mb-0.5">
+            <span class="text-slate-400">回転速度 (現在: <span id="speed-val" class="font-bold text-white">0.5</span>)</span>
+          </div>
+          <input type="range" id="speed-slider" min="0" max="3" step="0.1" value="0.5" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
+        </div>
       </div>
     </div>
   </div>
@@ -147,7 +166,7 @@
     
     <a-assets>
       <!-- GLBモデルの読み込み -->
-      <a-asset-item id="saturnModel" src="./saturn.glb"></a-asset-item>
+      <a-asset-item id="saturnModel" src="./saturn_planet.glb"></a-asset-item>
     </a-assets>
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -183,6 +202,18 @@
     const statusText = document.querySelector('#target-status');
     const debugLog = document.querySelector('#debug-log');
     const saturnMesh = document.querySelector('#saturn-mesh');
+
+    // コントローラーの表示・非表示トグル処理
+    window.toggleController = function() {
+      const content = document.getElementById('controller-content');
+      const icon = document.getElementById('collapse-icon');
+      content.classList.toggle('collapsed');
+      if (content.classList.contains('collapsed')) {
+        icon.style.transform = 'rotate(-90deg)';
+      } else {
+        icon.style.transform = 'rotate(0deg)';
+      }
+    };
 
     // ログ出力関数
     function log(message) {
