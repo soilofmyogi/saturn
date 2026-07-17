@@ -3,68 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>WebAR Saturn (.glb) - Debugger Pro</title>
+  <title>WebAR Saturn (.glb)</title>
   
-  <!-- A-Frame と MindAR のライブラリを読み込み -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-  <!-- Tailwind CSS を読み込んでUIを美しくスタイリング -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 動作実績が最も安定している A-Frame 1.4.2 と MindAR を読み込み -->
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js" crossorigin="anonymous"></script>
   
   <script>
-    // 【新機能】モデルのサイズと原点のズレを自動的に正規化するコンポーネント
-    AFRAME.registerComponent('auto-center-scale', {
-      init: function () {
-        this.el.addEventListener('model-loaded', () => {
-          const obj = this.el.getObject3D('mesh');
-          if (!obj) return;
-
-          // 3Dモデル全体の境界ボックス（Bounding Box）を取得
-          const box = new THREE.Box3().setFromObject(obj);
-          const size = new THREE.Vector3();
-          box.getSize(size);
-          const center = new THREE.Vector3();
-          box.getCenter(center);
-
-          // モデルの最大寸法（X, Y, Zの中で一番大きい部分のサイズ）
-          const maxDim = Math.max(size.x, size.y, size.z);
-          
-          if (maxDim === 0) {
-            log("エラー: モデルのサイズが0です。形状データを確認してください。");
-            return;
-          }
-
-          // 目標とする表示サイズ（直径約 0.8 メートル前後にリサイズ）
-          const targetSize = 0.8; 
-          const autoScaleFactor = targetSize / maxDim;
-
-          // 原点のズレ（重心）を算出して相殺（モデルの中心を強制的に 0, 0, 0 に持ってくる）
-          obj.position.x = -center.x;
-          obj.position.y = -center.y;
-          obj.position.z = -center.z;
-
-          // 自動スケールを反映
-          this.el.setAttribute('scale', `${autoScaleFactor} ${autoScaleFactor} ${autoScaleFactor}`);
-          
-          log(`【自動補正】元サイズ: ${maxDim.toFixed(2)}m → ${autoScaleFactor.toFixed(5)}倍に自動調整`);
-          log(`【自動補正】中心ズレ補正: X:${center.x.toFixed(2)}, Y:${center.y.toFixed(2)}, Z:${center.z.toFixed(2)}`);
-
-          // スライダー側の数値を自動調整値に同期させる
-          if (window.syncAutoScale) {
-            window.syncAutoScale(autoScaleFactor);
-          }
-        });
-      }
-    });
-
-    // ゆっくり回転させるカスタムコンポーネント
+    // ローカルのY軸に対してゆっくり回転させるカスタムコンポーネント
     AFRAME.registerComponent('slow-rotate', {
       schema: { speed: { type: 'number', default: 0.5 } },
       tick: function (time, timeDelta) {
         if (!this.el) return;
         let currentRotation = this.el.getAttribute('rotation');
         if (currentRotation) {
-          // 時間経過に合わせて滑らかにY軸を回転
+          // 時間経過に合わせて滑らかにY軸（自転軸）を回転
           currentRotation.y += (this.data.speed * (timeDelta / 100));
           this.el.setAttribute('rotation', currentRotation);
         }
@@ -79,12 +32,10 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: 'Inter', sans-serif;
+      font-family: sans-serif;
     }
 
-    /* 【カメラ全画面化対策】
-       MindARが生成するカメラ映像(video)とA-Frameの描画キャンバス(.a-canvas)を
-       強制的に画面全体いっぱいに引き伸ばし、左寄りを防ぐ設定 */
+    /* カメラ映像と描画キャンバスを画面全体いっぱいに引き伸ばし、左寄りを防ぐ設定 */
     video, .a-canvas {
       position: fixed !important;
       top: 0 !important;
@@ -95,51 +46,39 @@
       z-index: -10 !important;
     }
 
-    /* スキャン待ちの案内画面 */
+    /* スキャン待ちの簡易案内画面 */
     #scanning-overlay {
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(15, 23, 42, 0.85);
+      background: rgba(15, 23, 42, 0.8);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       color: white;
-      font-size: 18px;
+      font-size: 16px;
       z-index: 50;
       pointer-events: none;
-      transition: opacity 0.5s ease;
+      transition: opacity 0.4s ease;
     }
     #scanning-overlay.hidden {
       opacity: 0;
     }
     .spinner {
-      border: 4px solid rgba(255, 255, 255, 0.1);
-      width: 50px;
-      height: 50px;
+      border: 3px solid rgba(255, 255, 255, 0.1);
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
       border-left-color: #3b82f6;
       animation: spin 1s linear infinite;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
-    }
-    /* コントローラーの開閉アニメーション用 */
-    #controller-content {
-      transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
-      max-height: 500px;
-      opacity: 1;
-      overflow: hidden;
-    }
-    #controller-content.collapsed {
-      max-height: 0;
-      opacity: 0;
-      pointer-events: none;
     }
   </style>
 </head>
@@ -148,73 +87,9 @@
   <!-- 案内オーバーレイUI -->
   <div id="scanning-overlay">
     <div class="spinner"></div>
-    <div class="text-center px-4">
-      <p class="font-bold text-xl mb-2 text-blue-400">Saturn AR 準備完了</p>
-      <p class="text-sm text-slate-300">「saturn.mind」を画面全体でスキャンしてください</p>
-    </div>
-  </div>
-
-  <!-- 画面上のリアルタイムデバッグ・調整用UIコントローラー（超コンパクト＆開閉式） -->
-  <div class="fixed bottom-4 left-4 right-4 md:left-4 md:right-auto md:w-72 bg-slate-900/95 backdrop-blur-md text-white p-3 rounded-xl shadow-2xl border border-slate-700/50 z-50 transition-all text-xs">
-    <!-- ヘッダー部分（クリックして開閉可能） -->
-    <div onclick="toggleController()" class="flex justify-between items-center cursor-pointer select-none pb-1 border-b border-slate-800">
-      <h3 class="font-bold tracking-wider text-blue-400 flex items-center gap-1.5 text-[11px]">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-        MODEL CONTROLLER
-      </h3>
-      <div class="flex items-center gap-2">
-        <span id="target-status" class="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full border border-red-500/30">マーカー未検出</span>
-        <svg id="collapse-icon" class="w-4 h-4 text-slate-400 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-      </div>
-    </div>
-
-    <!-- 開閉するコンテンツエリア -->
-    <div id="controller-content" class="mt-2.5 space-y-2.5">
-      <!-- デバッグ用ログ表示エリア -->
-      <div class="bg-black/40 rounded-md p-1.5 font-mono text-[9px] text-slate-400 max-h-16 overflow-y-auto" id="debug-log">
-        システム初期化中...
-      </div>
-
-      <!-- 各種パラメータ調整スライダー -->
-      <div class="space-y-2 text-[10px]">
-        <!-- スケールの倍率微調整（自動調整値を基準にさらに倍率をかけられます） -->
-        <div>
-          <div class="flex justify-between mb-0.5">
-            <span class="text-slate-400">スケール微調整 (現在: <span id="scale-val" class="font-bold text-white">1.0</span>倍)</span>
-          </div>
-          <div class="grid grid-cols-4 gap-1">
-            <button onclick="changeScalePreset(0.1)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">0.1倍</button>
-            <button onclick="changeScalePreset(0.5)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">0.5倍</button>
-            <button onclick="changeScalePreset(1.0)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">基準値 (1.0)</button>
-            <button onclick="changeScalePreset(2.0)" class="bg-slate-800 hover:bg-slate-700 py-0.5 rounded border border-slate-700 text-[9px]">2.0倍</button>
-          </div>
-          <input type="range" id="scale-slider" min="0.05" max="5" step="0.05" value="1" class="w-full mt-1.5 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
-        </div>
-
-        <!-- 位置調整 (Z軸：手前・奥) -->
-        <div>
-          <div class="flex justify-between mb-0.5">
-            <span class="text-slate-400">位置: 前後 (Z軸: <span id="pos-z-val" class="font-bold text-white">0.0</span>)</span>
-          </div>
-          <input type="range" id="pos-z-slider" min="-3" max="3" step="0.1" value="0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
-        </div>
-
-        <!-- 位置調整 (Y軸：上下) -->
-        <div>
-          <div class="flex justify-between mb-0.5">
-            <span class="text-slate-400">位置: 上下 (Y軸: <span id="pos-y-val" class="font-bold text-white">0.0</span>)</span>
-          </div>
-          <input type="range" id="pos-y-slider" min="-3" max="3" step="0.1" value="0" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
-        </div>
-
-        <!-- 回転速度 -->
-        <div>
-          <div class="flex justify-between mb-0.5">
-            <span class="text-slate-400">回転速度 (現在: <span id="speed-val" class="font-bold text-white">0.5</span>)</span>
-          </div>
-          <input type="range" id="speed-slider" min="0" max="3" step="0.1" value="0.5" class="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
-        </div>
-      </div>
+    <div style="text-align: center; padding: 0 16px;">
+      <p style="margin: 0 0 8px 0; font-weight: bold; color: #60a5fa;">Saturn AR</p>
+      <p style="margin: 0; font-size: 13px; color: #cbd5e1;">「saturn.mind」をスキャンしてください</p>
     </div>
   </div>
 
@@ -233,28 +108,35 @@
 
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- 
-      環境光(ambient)と平行光(directional)を追加し、
-      モデルがしっかりと明るく照らされるように設定
-    -->
-    <a-entity light="type: ambient; color: #ffffff; intensity: 1.8"></a-entity>
+    <!-- 環境光と平行光でモデルを明るく照らす -->
+    <a-entity light="type: ambient; color: #ffffff; intensity: 1.5"></a-entity>
     <a-entity light="type: directional; color: #ffffff; intensity: 1.2" position="1 3 2"></a-entity>
 
     <!-- ARマーカーターゲット -->
     <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
+      
       <!-- 
-        【自動補正を付与】
-        auto-center-scale と slow-rotate を同時適用
+        【頭を上に向けるための回転アライメント】
+        手前を向いている頭（Z軸方向）を、奥に90度倒して上（Y軸方向）に向けます。
+        X軸を -90 度回転させることで、奥方向へ綺麗に倒れます。
       -->
-      <a-gltf-model 
-        id="saturn-mesh"
-        src="#saturnModel" 
-        scale="1 1 1" 
-        position="0 0 0" 
-        rotation="0 0 0"
-        auto-center-scale
-        slow-rotate="speed: 0.5">
-      </a-gltf-model>
+      <a-entity rotation="-90 0 0">
+        
+        <!-- 
+          【実際のモデルデータ】
+          スケールを「最小（0.01）」に固定。
+          slow-rotate（自転コンポーネント）によって、傾いた軸に対して綺麗に水平回転します。
+        -->
+        <a-gltf-model 
+          id="saturn-mesh"
+          src="#saturnModel" 
+          scale="0.01 0.01 0.01" 
+          position="0 0 0"
+          slow-rotate="speed: 0.5">
+        </a-gltf-model>
+        
+      </a-entity>
+      
     </a-entity>
 
   </a-scene>
@@ -262,121 +144,16 @@
   <script>
     const targetEl = document.querySelector('#ar-target');
     const overlay = document.querySelector('#scanning-overlay');
-    const statusText = document.querySelector('#target-status');
-    const debugLog = document.querySelector('#debug-log');
-    const saturnMesh = document.querySelector('#saturn-mesh');
 
-    // コントローラーの表示・非表示トグル処理
-    window.toggleController = function() {
-      const content = document.getElementById('controller-content');
-      const icon = document.getElementById('collapse-icon');
-      content.classList.toggle('collapsed');
-      if (content.classList.contains('collapsed')) {
-        icon.style.transform = 'rotate(-90deg)';
-      } else {
-        icon.style.transform = 'rotate(0deg)';
-      }
-    };
-
-    // ログ出力関数
-    function log(message) {
-      const now = new Date();
-      const timeStr = now.toTimeString().split(' ')[0];
-      debugLog.innerHTML = `[${timeStr}] ${message}<br>` + debugLog.innerHTML;
-      debugLog.scrollTop = 0; // 最新ログが常に見えるようにする
-    }
-
-    // マーカー検出・ロスト監視
+    // マーカー検出時にスキャン案内を非表示にする
     targetEl.addEventListener("targetFound", () => {
       overlay.classList.add('hidden');
-      statusText.textContent = "マーカー検出中";
-      statusText.className = "text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30";
-      log("マーカーを検出しました！");
     });
     
+    // マーカーを見失った時にスキャン案内を再表示する
     targetEl.addEventListener("targetLost", () => {
       overlay.classList.remove('hidden');
-      statusText.textContent = "マーカー未検出";
-      statusText.className = "text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full border border-red-500/30";
-      log("マーカーを見失いました");
     });
-
-    // GLBモデル読み込み状態の監視
-    saturnMesh.addEventListener('model-loaded', () => {
-      log("モデルの読み込み完了（正常）");
-    });
-
-    saturnMesh.addEventListener('model-error', (e) => {
-      log("エラー: モデル読み込み失敗。パスや形式を確認してください。");
-      console.error(e);
-    });
-
-    // --- UI操作によるモデル調整システム ---
-    const scaleSlider = document.getElementById('scale-slider');
-    const scaleVal = document.getElementById('scale-val');
-    const posZSlider = document.getElementById('pos-z-slider');
-    const posZVal = document.getElementById('pos-z-val');
-    const posYSlider = document.getElementById('pos-y-slider');
-    const posYVal = document.getElementById('pos-y-val');
-    const speedSlider = document.getElementById('speed-slider');
-    const speedVal = document.getElementById('speed-val');
-
-    // 自動センタライズされたスケール値の受け皿
-    let autoCalculatedScale = 1.0;
-    let manualMultiplier = 1.0;
-
-    // 自動補正コンポーネントから基準スケール値を受け取る関数
-    window.syncAutoScale = function(baseScale) {
-      autoCalculatedScale = baseScale;
-      updateFinalScale();
-    };
-
-    // スケールを最終反映する関数
-    function updateFinalScale() {
-      const finalScale = autoCalculatedScale * manualMultiplier;
-      saturnMesh.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
-      scaleVal.textContent = manualMultiplier.toFixed(2);
-    }
-
-    // プリセットボタン操作
-    window.changeScalePreset = function(multiplier) {
-      manualMultiplier = multiplier;
-      scaleSlider.value = multiplier;
-      updateFinalScale();
-      log(`スケール乗数を変更: ${multiplier}倍`);
-    };
-
-    // スライダードラッグ時のイベント
-    scaleSlider.addEventListener('input', () => {
-      manualMultiplier = parseFloat(scaleSlider.value);
-      updateFinalScale();
-    });
-
-    posZSlider.addEventListener('input', () => {
-      const z = parseFloat(posZSlider.value);
-      const currentPos = saturnMesh.getAttribute('position') || {x: 0, y: 0, z: 0};
-      currentPos.z = z;
-      saturnMesh.setAttribute('position', currentPos);
-      posZVal.textContent = z.toFixed(1);
-    });
-
-    posYSlider.addEventListener('input', () => {
-      const y = parseFloat(posYSlider.value);
-      const currentPos = saturnMesh.getAttribute('position') || {x: 0, y: 0, z: 0};
-      currentPos.y = y;
-      saturnMesh.setAttribute('position', currentPos);
-      posYVal.textContent = y.toFixed(1);
-    });
-
-    speedSlider.addEventListener('input', () => {
-      const speed = parseFloat(speedSlider.value);
-      saturnMesh.setAttribute('slow-rotate', `speed: ${speed}`);
-      speedVal.textContent = speed.toFixed(1);
-    });
-
-    // 初期化ログ
-    log("A-Frame全画面補正 適用完了");
-    log("A-Frameシーン ロード中...");
   </script>
 
 </body>
