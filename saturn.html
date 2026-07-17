@@ -1,298 +1,61 @@
 <!DOCTYPE html>
-<html lang="ja">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>WebAR Saturn (.glb)</title>
-  
-  <!-- 動作実績が最も安定している A-Frame 1.4.2 と MindAR を読み込み -->
-  <script src="https://aframe.io/releases/1.4.2/aframe.min.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js" crossorigin="anonymous"></script>
-  <!-- Tailwind CSS を使ってコントローラーをスマートにデザイン -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <script>
-    // ローカルのY軸に対してゆっくり回転させるカスタムコンポーネント
-    AFRAME.registerComponent('slow-rotate', {
-      schema: { speed: { type: 'number', default: 0.5 } },
-      tick: function (time, timeDelta) {
-        if (!this.el) return;
-        let currentRotation = this.el.getAttribute('rotation');
-        if (currentRotation) {
-          // 時間経過に合わせて滑らかにY軸（自転軸）を回転
-          currentRotation.y += (this.data.speed * (timeDelta / 100));
-          this.el.setAttribute('rotation', currentRotation);
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Saturn AR</title>
+    <!-- A-FrameとMindARの読み込み -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <script>
+      // ゆっくり回転するコンポーネント
+      AFRAME.registerComponent('slow-rotate', {
+        tick: function (time, timeDelta) {
+          if (!this.el) return;
+          const currentRot = this.el.getAttribute('rotation');
+          this.el.setAttribute('rotation', {
+            x: currentRot.x,
+            y: currentRot.y + (1.0 * timeDelta / 100),
+            z: currentRot.z
+          });
         }
-      }
-    });
-
-    // 3Dモデルの「原点ズレ」と「巨大/極小サイズ」を自動的に補正するコンポーネント
-    AFRAME.registerComponent('auto-normalize', {
-      init: function () {
-        this.el.addEventListener('model-loaded', () => {
-          const obj = this.el.getObject3D('mesh');
-          if (!obj) return;
-          
-          // 1. オリジナルのバウンディングボックスを計算
-          const box = new THREE.Box3().setFromObject(obj);
-          const center = new THREE.Vector3();
-          const size = new THREE.Vector3();
-          box.getCenter(center);
-          box.getSize(size);
-          const maxDim = Math.max(size.x, size.y, size.z);
-
-          // 2. 原点のズレをリセット（中心を0,0,0にする）
-          obj.position.x = -center.x;
-          obj.position.y = -center.y;
-          obj.position.z = -center.z;
-
-          // 3. 全体のスケールを「最大幅=1.0単位」になるように強制リサイズ
-          if (maxDim > 0) {
-            const scaleFactor = 1.0 / maxDim;
-            obj.scale.set(scaleFactor, scaleFactor, scaleFactor);
-          }
-
-          // UIに補正結果を表示
-          const sizeInfo = document.querySelector('#model-size-info');
-          if (sizeInfo) {
-            sizeInfo.textContent = `元サイズ: ${maxDim.toFixed(2)} -> 補正済`;
-            sizeInfo.className = "text-[10px] text-green-300 mt-2 font-bold bg-green-900/30 p-1 rounded inline-block";
-          }
-        });
-      }
-    });
-  </script>
-
-  <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      font-family: sans-serif;
-    }
-
-    /* カメラ映像と描画キャンバスを画面全体いっぱいに引き伸ばし、左寄りを防ぐ設定 */
-    video, .a-canvas {
-      position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      object-fit: cover !important;
-      z-index: -10 !important;
-    }
-  </style>
-</head>
-<body class="bg-black select-none">
-
-  <!-- 画面左上のスマートなコントローラーUI -->
-  <div class="fixed top-4 left-4 z-50 w-72 bg-slate-900/90 text-white p-4 rounded-2xl shadow-2xl border border-slate-700/50 backdrop-blur-md">
-    
-    <!-- タイトル -->
-    <div class="flex items-center justify-between border-b border-slate-700/60 pb-2 mb-3">
-      <span class="font-bold text-sm text-blue-400 flex items-center gap-1.5">
-        🪐 Saturn AR
-      </span>
-      <span class="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">v1.2</span>
-    </div>
-
-    <!-- ステータスセクション -->
-    <div class="space-y-1.5 text-xs mb-4 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
-      <div class="flex justify-between items-center">
-        <span class="text-slate-400">モデルの状態:</span>
-        <span id="model-status" class="font-semibold text-yellow-400">読込中...</span>
-      </div>
-      <div class="flex justify-between items-center">
-        <span class="text-slate-400">マーカー検知:</span>
-        <span id="ar-status" class="font-semibold text-red-400">スキャン待ち</span>
-      </div>
-    </div>
-
-    <!-- スケール調整セクション (対数スケール) -->
-    <div class="space-y-2 mb-4">
-      <div class="flex justify-between items-center text-xs">
-        <span class="text-slate-300 font-medium">表示サイズ (スケール)</span>
-        <span id="scale-val" class="font-mono text-blue-300 bg-blue-950/40 px-2 py-0.5 rounded">0.0100</span>
-      </div>
+      });
+    </script>
+  </head>
+  <body style="margin: 0; overflow: hidden;">
+    <!-- ARシーン -->
+    <a-scene 
+      mindar-image="imageTargetSrc: ./saturn.mind; autoStart: true;" 
+      color-space="sRGB" 
+      renderer="colorManagement: true;" 
+      vr-mode-ui="enabled: false" 
+      device-orientation-permission-ui="enabled: false">
       
-      <!-- スライダー (対数: 10^-6 から 10^3 まで) -->
-      <input 
-        id="scale-slider" 
-        type="range" 
-        min="-6" 
-        max="3" 
-        step="0.1" 
-        value="0" 
-        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-      >
+      <a-assets>
+        <!-- 3Dモデルの読み込み -->
+        <a-asset-item id="saturn" src="./saturn_planet.glb"></a-asset-item>
+      </a-assets>
 
-      <!-- ショートカットサイズプリセットボタン -->
-      <div class="grid grid-cols-4 gap-1 pt-1">
-        <button onclick="setPresetScale(0.1)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">0.1</button>
-        <button onclick="setPresetScale(0.5)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">0.5</button>
-        <button onclick="setPresetScale(1)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition font-bold text-blue-300">1.0</button>
-        <button onclick="setPresetScale(2)" class="text-[10px] bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 transition">2.0</button>
-      </div>
-      <div id="model-size-info" class="text-xs text-slate-400 mt-2">元サイズ: 取得中...</div>
-    </div>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-    <!-- 高さ調整セクション -->
-    <div class="space-y-2">
-      <div class="flex justify-between items-center text-xs">
-        <span class="text-slate-300 font-medium">浮遊する高さ (Z軸)</span>
-        <span id="height-val" class="font-mono text-green-300 bg-green-950/40 px-2 py-0.5 rounded">0.50</span>
-      </div>
-      <input 
-        id="height-slider" 
-        type="range" 
-        min="-2" 
-        max="5" 
-        step="0.05" 
-        value="0.5" 
-        class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-green-500"
-      >
-    </div>
+      <!-- 光源（モデルを明るく見せるため） -->
+      <a-entity light="type: ambient; color: #FFF; intensity: 1.5"></a-entity>
+      <a-entity light="type: directional; color: #FFF; intensity: 1.0" position="-1 2 1"></a-entity>
 
-  </div>
-
-  <!-- A-Frame ARシーン -->
-  <a-scene 
-    mindar-image="imageTargetSrc: ./saturn.mind; autoStart: true; maxTrack: 1;" 
-    color-space="sRGB" 
-    renderer="colorManagement: true; physicallyCorrectLights: true;" 
-    vr-mode-ui="enabled: false" 
-    device-orientation-permission-ui="enabled: false">
-    
-    <a-assets>
-      <!-- GLBモデルの読み込みパス（ファイル名を saturn_planet.glb に調整） -->
-      <a-asset-item id="saturnModel" src="./saturn_planet.glb"></a-asset-item>
-    </a-assets>
-
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-    <!-- 環境光と平行光でモデルを明るく照らす -->
-    <a-entity light="type: ambient; color: #ffffff; intensity: 1.5"></a-entity>
-    <a-entity light="type: directional; color: #ffffff; intensity: 1.2" position="1 3 2"></a-entity>
-
-    <!-- ARマーカーターゲット -->
-    <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
-      
-      <!-- 
-        【高さをつけ、頭を上に向けるためのアライメント】
-        Z軸（手前向き）に数値を足すことで、マーカーから浮き上がります。
-      -->
-      <a-entity id="align-wrapper" position="0 0 0.5" rotation="-90 0 0">
-        
+      <!-- マーカーを検知するターゲット -->
+      <a-entity mindar-image-target="targetIndex: 0">
         <!-- 
-          【実際のモデルデータ】
-          auto-normalizeによって常に幅1.0のサイズに補正され、原点も中心にリセットされます。
+          モデルを表示し、ゆっくり回転させる。
+          ※表示されない場合は、このscale="0.05 0.05 0.05" を 0.001 や 1.0 などに変更してみてください。
         -->
         <a-gltf-model 
-          id="saturn-mesh"
-          src="#saturnModel" 
-          scale="1 1 1" 
-          position="0 0 0"
-          slow-rotate="speed: 0.5"
-          auto-normalize>
+          src="#saturn" 
+          position="0 0 0" 
+          scale="0.05 0.05 0.05" 
+          rotation="0 0 0"
+          slow-rotate>
         </a-gltf-model>
-        
       </a-entity>
       
-    </a-entity>
-
-  </a-scene>
-
-  <script>
-    const targetEl = document.querySelector('#ar-target');
-    const saturnMesh = document.querySelector('#saturn-mesh');
-    const saturnAsset = document.querySelector('#saturnModel');
-    
-    const modelStatusText = document.querySelector('#model-status');
-    const arStatusText = document.querySelector('#ar-status');
-    const scaleSlider = document.querySelector('#scale-slider');
-    const scaleValText = document.querySelector('#scale-val');
-
-    // 1. モデルの読込状況を監視
-    saturnMesh.addEventListener('model-loaded', () => {
-      modelStatusText.textContent = '読み込み完了';
-      modelStatusText.className = 'font-semibold text-green-400';
-      
-      // 元のサイズを取得して表示する
-      try {
-        const object3D = saturnMesh.getObject3D('mesh');
-        if (object3D) {
-          const box = new THREE.Box3().setFromObject(object3D);
-          const size = new THREE.Vector3();
-          box.getSize(size);
-          const maxDim = Math.max(size.x, size.y, size.z);
-          document.querySelector('#model-size-info').textContent = `元サイズ: 約 ${maxDim.toFixed(2)} m`;
-        }
-      } catch (err) {
-        console.error("Size calc error", err);
-      }
-    });
-
-    saturnMesh.addEventListener('model-error', () => {
-      modelStatusText.textContent = '読込失敗(エラー)';
-      modelStatusText.className = 'font-semibold text-red-500';
-    });
-
-    // 2. マーカー検知状態を監視
-    targetEl.addEventListener("targetFound", () => {
-      arStatusText.textContent = '検出済';
-      arStatusText.className = 'font-semibold text-green-400';
-    });
-    
-    targetEl.addEventListener("targetLost", () => {
-      arStatusText.textContent = 'スキャン待ち';
-      arStatusText.className = 'font-semibold text-red-400';
-    });
-
-    // 3. スライダーによるスケール調整処理
-    function updateModelScale(scaleValue) {
-      // スケールを適用
-      saturnMesh.setAttribute('scale', `${scaleValue} ${scaleValue} ${scaleValue}`);
-      
-      // 数値表示を更新
-      if (scaleValue < 0.001 || scaleValue >= 1000) {
-        scaleValText.textContent = Number(scaleValue).toExponential(2);
-      } else {
-        scaleValText.textContent = Number(scaleValue).toFixed(4);
-      }
-      
-      // スライダーの位置を同期 (対数スケール)
-      scaleSlider.value = Math.log10(scaleValue);
-    }
-
-    scaleSlider.addEventListener('input', (e) => {
-      // スライダーの値(対数)から実スケールを計算して適用
-      const realScale = Math.pow(10, parseFloat(e.target.value));
-      updateModelScale(realScale);
-    });
-
-    // 4. クイックサイズ変更ボタン用のグローバル関数
-    window.setPresetScale = function(value) {
-      updateModelScale(value);
-    };
-
-    // 5. 高さ調整の処理
-    const heightSlider = document.querySelector('#height-slider');
-    const heightValText = document.querySelector('#height-val');
-    const alignWrapper = document.querySelector('#align-wrapper');
-
-    function updateModelHeight(heightValue) {
-      // Z軸方向に高さを設定して浮かせる
-      alignWrapper.setAttribute('position', `0 0 ${heightValue}`);
-      heightValText.textContent = Number(heightValue).toFixed(2);
-    }
-
-    heightSlider.addEventListener('input', (e) => {
-      updateModelHeight(e.target.value);
-    });
-
-  </script>
-
-</body>
+    </a-scene>
+  </body>
 </html>
