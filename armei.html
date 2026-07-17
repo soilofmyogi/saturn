@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>アニメーション付きWebAR</title>
+    
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <!-- AR.js を削除し、MindAR (画像トラッキング) を読み込む -->
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <!-- A-Frame Extras (アニメーション再生の animation-mixer 用) -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
+    
+</head>
+<body style="margin : 0px; overflow: hidden;">
+    
+    <!-- AR.jsの <a-scene embedded arjs> から、MindAR用に変更 -->
+    <a-scene 
+      mindar-image="imageTargetSrc: ./armei.mind; autoStart: true;" 
+      color-space="sRGB" 
+      renderer="colorManagement: true;" 
+      vr-mode-ui="enabled: false" 
+      device-orientation-permission-ui="enabled: false">
+        
+        <!-- 3Dモデルを事前に読み込む -->
+        <a-assets>
+            <a-asset-item id="girlModel" src="girl.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- MindAR用のカメラ設定 -->
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <!-- 光源（モデルを明るく照らす） -->
+        <a-entity light="type: ambient; color: #FFF; intensity: 1.2"></a-entity>
+        <a-entity light="type: directional; color: #FFF; intensity: 0.8" position="-1 2 1"></a-entity>
+
+        <!-- a-marker preset="hiro" から MindARターゲットへ変更 -->
+        <a-entity mindar-image-target="targetIndex: 0">
+            
+            <!-- 
+                モデルの表示。
+                もしモデルがマーカーに対して寝転がってしまう場合は、
+                rotation="90 0 0" または rotation="-90 0 0" に変更して立たせてください。
+            -->
+            <a-entity 
+                gltf-model="#girlModel" 
+                position="0 0 0" 
+                scale="0.5 0.5 0.5"
+                rotation="0 0 0"
+                animation-mixer> 
+            </a-entity>
+
+        </a-entity>
+
+    </a-scene>
+</body>
+</html>
