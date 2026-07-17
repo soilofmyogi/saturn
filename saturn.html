@@ -3,21 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>WebAR Saturn (.glb)</title>
+  <title>WebAR Saturn (.glb) - Debugger</title>
   
   <!-- A-Frame と MindAR のライブラリを読み込み -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+  <!-- Tailwind CSS を読み込んでUIを美しくスタイリング -->
+  <script src="https://cdn.tailwindcss.com"></script>
   
   <script>
     // ゆっくり回転させるカスタムコンポーネント
     AFRAME.registerComponent('slow-rotate', {
       schema: { speed: { type: 'number', default: 0.5 } },
       tick: function (time, timeDelta) {
+        if (!this.el) return;
         let currentRotation = this.el.getAttribute('rotation');
-        // 時間経過に合わせて滑らかにY軸を回転
-        currentRotation.y += (this.data.speed * (timeDelta / 100));
-        this.el.setAttribute('rotation', currentRotation);
+        if (currentRotation) {
+          // 時間経過に合わせて滑らかにY軸を回転
+          currentRotation.y += (this.data.speed * (timeDelta / 100));
+          this.el.setAttribute('rotation', currentRotation);
+        }
       }
     });
   </script>
@@ -26,7 +31,7 @@
     body {
       margin: 0;
       overflow: hidden;
-      font-family: sans-serif;
+      font-family: 'Inter', sans-serif;
     }
     /* スキャン待ちの案内画面 */
     #scanning-overlay {
@@ -35,14 +40,14 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(15, 23, 42, 0.85);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       color: white;
       font-size: 18px;
-      z-index: 9999;
+      z-index: 50;
       pointer-events: none;
       transition: opacity 0.5s ease;
     }
@@ -50,11 +55,11 @@
       opacity: 0;
     }
     .spinner {
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      width: 40px;
-      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      width: 50px;
+      height: 50px;
       border-radius: 50%;
-      border-left-color: #fff;
+      border-left-color: #3b82f6;
       animation: spin 1s linear infinite;
       margin-bottom: 20px;
     }
@@ -69,9 +74,70 @@
   <!-- 案内オーバーレイUI -->
   <div id="scanning-overlay">
     <div class="spinner"></div>
-    <div>saturn.mindをカメラにかざしてください</div>
+    <div class="text-center px-4">
+      <p class="font-bold text-xl mb-2 text-blue-400">Saturn AR 準備完了</p>
+      <p class="text-sm text-slate-300">「saturn.mind」をカメラに平行にかざしてください</p>
+    </div>
   </div>
 
+  <!-- 画面上のリアルタイムデバッグ・調整用UIコントローラー -->
+  <div class="fixed bottom-4 left-4 right-4 md:left-4 md:right-auto md:w-80 bg-slate-900/90 backdrop-blur-md text-white p-4 rounded-2xl shadow-2xl border border-slate-700/50 z-50 transition-all">
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold text-sm tracking-wider text-blue-400 flex items-center gap-1">
+        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+        MODEL CONTROLLER
+      </h3>
+      <span id="target-status" class="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full border border-red-500/30">マーカー未検出</span>
+    </div>
+
+    <!-- デバッグ用ログ表示エリア（トラブルが一目で分かる） -->
+    <div class="bg-black/40 rounded-lg p-2 text-[10px] font-mono text-slate-300 mb-3 max-h-16 overflow-y-auto" id="debug-log">
+      システム初期化中...
+    </div>
+
+    <!-- 各種パラメータ調整スライダー -->
+    <div class="space-y-3 text-xs">
+      <!-- スケール（倍率）の桁数コントロール -->
+      <div>
+        <div class="flex justify-between mb-1">
+          <span class="text-slate-400">スケール基準 (現在: <span id="scale-val" class="font-bold text-white">1.0</span>)</span>
+        </div>
+        <div class="grid grid-cols-4 gap-1">
+          <button onclick="changeScalePreset(0.01)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">極小 (0.01)</button>
+          <button onclick="changeScalePreset(0.1)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">小 (0.1)</button>
+          <button onclick="changeScalePreset(1.0)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">等倍 (1.0)</button>
+          <button onclick="changeScalePreset(10.0)" class="bg-slate-800 hover:bg-slate-700 py-1 rounded border border-slate-700 text-[10px]">極大 (10.0)</button>
+        </div>
+        <input type="range" id="scale-slider" min="0.001" max="5" step="0.001" value="1" class="w-full mt-2 accent-blue-500">
+      </div>
+
+      <!-- 位置調整 (Z軸：手前・奥) -->
+      <div>
+        <div class="flex justify-between mb-1">
+          <span class="text-slate-400">位置: 前後 (Z軸: <span id="pos-z-val" class="font-bold text-white">0.0</span>)</span>
+        </div>
+        <input type="range" id="pos-z-slider" min="-3" max="3" step="0.1" value="0" class="w-full accent-blue-500">
+      </div>
+
+      <!-- 位置調整 (Y軸：上下) -->
+      <div>
+        <div class="flex justify-between mb-1">
+          <span class="text-slate-400">位置: 上下 (Y軸: <span id="pos-y-val" class="font-bold text-white">0.0</span>)</span>
+        </div>
+        <input type="range" id="pos-y-slider" min="-3" max="3" step="0.1" value="0" class="w-full accent-blue-500">
+      </div>
+
+      <!-- 回転速度 -->
+      <div>
+        <div class="flex justify-between mb-1">
+          <span class="text-slate-400">開店（回転）速度 (現在: <span id="speed-val" class="font-bold text-white">0.5</span>)</span>
+        </div>
+        <input type="range" id="speed-slider" min="0" max="3" step="0.1" value="0.5" class="w-full accent-blue-500">
+      </div>
+    </div>
+  </div>
+
+  <!-- A-Frame ARシーン -->
   <a-scene 
     mindar-image="imageTargetSrc: ./saturn.mind; autoStart: true; maxTrack: 1;" 
     color-space="sRGB" 
@@ -87,20 +153,20 @@
     <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
     <!-- 
-      モデルが暗くならないよう、均一に照らす環境光（ambient）と、
-      陰影をつけて立体感を出す平行光（directional）を配置
+      環境光(ambient)と平行光(directional)を追加し、
+      モデルがしっかりと照らされるように設定
     -->
-    <a-entity light="type: ambient; color: #ffffff; intensity: 1.2"></a-entity>
-    <a-entity light="type: directional; color: #ffffff; intensity: 0.8" position="1 2 1"></a-entity>
+    <a-entity light="type: ambient; color: #ffffff; intensity: 1.5"></a-entity>
+    <a-entity light="type: directional; color: #ffffff; intensity: 1.0" position="1 2.5 1"></a-entity>
 
     <!-- ARマーカーターゲット -->
     <a-entity id="ar-target" mindar-image-target="targetIndex: 0">
       <!-- 
-        GLBモデルを配置。
-        scale（大きさ）、position（位置）、rotation（初期角度）は、
-        実際のモデルの見え方に合わせて適宜微調整してください。
+        モデルを表示。デバッグ用にID 'saturn-mesh' を設定し、
+        スクリプトからリアルタイムにスケールや位置をいじれるようにします。
       -->
       <a-gltf-model 
+        id="saturn-mesh"
         src="#saturnModel" 
         scale="1 1 1" 
         position="0 0 0" 
@@ -112,17 +178,99 @@
   </a-scene>
 
   <script>
-    // マーカー検知時・ロスト時に案内UIを出し入れする制御
     const targetEl = document.querySelector('#ar-target');
     const overlay = document.querySelector('#scanning-overlay');
-    
+    const statusText = document.querySelector('#target-status');
+    const debugLog = document.querySelector('#debug-log');
+    const saturnMesh = document.querySelector('#saturn-mesh');
+
+    // ログ出力関数
+    function log(message) {
+      const now = new Date();
+      const timeStr = now.toTimeString().split(' ')[0];
+      debugLog.innerHTML = `[${timeStr}] ${message}<br>` + debugLog.innerHTML;
+    }
+
+    // マーカー検出・ロスト監視
     targetEl.addEventListener("targetFound", () => {
       overlay.classList.add('hidden');
+      statusText.textContent = "マーカー検出中";
+      statusText.className = "text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full border border-emerald-500/30";
+      log("マーカーを検出しました！");
     });
     
     targetEl.addEventListener("targetLost", () => {
       overlay.classList.remove('hidden');
+      statusText.textContent = "マーカー未検出";
+      statusText.className = "text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full border border-red-500/30";
+      log("マーカーを見失いました");
     });
+
+    // GLBモデル読み込み状態の監視
+    saturnMesh.addEventListener('model-loaded', () => {
+      log("モデルの読み込み完了（正常）");
+    });
+
+    saturnMesh.addEventListener('model-error', (e) => {
+      log("エラー: モデル読み込み失敗！ファイルパスや形式を確認してください。");
+      console.error(e);
+    });
+
+    // --- UI操作によるモデル調整システム ---
+    const scaleSlider = document.getElementById('scale-slider');
+    const scaleVal = document.getElementById('scale-val');
+    const posZSlider = document.getElementById('pos-z-slider');
+    const posZVal = document.getElementById('pos-z-val');
+    const posYSlider = document.getElementById('pos-y-slider');
+    const posYVal = document.getElementById('pos-y-val');
+    const speedSlider = document.getElementById('speed-slider');
+    const speedVal = document.getElementById('speed-val');
+
+    let currentBaseScale = 1.0;
+
+    // スケールを更新する関数
+    function updateScale() {
+      const sliderVal = parseFloat(scaleSlider.value);
+      const finalScale = sliderVal * currentBaseScale;
+      saturnMesh.setAttribute('scale', `${finalScale} ${finalScale} ${finalScale}`);
+      scaleVal.textContent = finalScale.toFixed(4);
+      log(`スケール変更: ${finalScale.toFixed(4)}倍`);
+    }
+
+    // プリセットボタン
+    window.changeScalePreset = function(preset) {
+      currentBaseScale = preset;
+      scaleSlider.value = 1.0; // スライダーを中間にリセット
+      updateScale();
+    };
+
+    // スライダードラッグ時のイベント
+    scaleSlider.addEventListener('input', updateScale);
+
+    posZSlider.addEventListener('input', () => {
+      const z = parseFloat(posZSlider.value);
+      const currentPos = saturnMesh.getAttribute('position');
+      currentPos.z = z;
+      saturnMesh.setAttribute('position', currentPos);
+      posZVal.textContent = z.toFixed(1);
+    });
+
+    posYSlider.addEventListener('input', () => {
+      const y = parseFloat(posYSlider.value);
+      const currentPos = saturnMesh.getAttribute('position');
+      currentPos.y = y;
+      saturnMesh.setAttribute('position', currentPos);
+      posYVal.textContent = y.toFixed(1);
+    });
+
+    speedSlider.addEventListener('input', () => {
+      const speed = parseFloat(speedSlider.value);
+      saturnMesh.setAttribute('slow-rotate', `speed: ${speed}`);
+      speedVal.textContent = speed.toFixed(1);
+    });
+
+    // 初期化ログ
+    log("A-Frameシーン ロード中...");
   </script>
 
 </body>
